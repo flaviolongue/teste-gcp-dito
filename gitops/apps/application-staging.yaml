@@ -1,0 +1,34 @@
+# Application de STAGING.
+# Sincronização AUTOMÁTICA: todo commit em manifests/overlays/staging na branch
+# main é aplicado sozinho no cluster de staging, sem intervenção humana.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dito-api-staging
+  namespace: argocd
+  # Impede a exclusão acidental da Application deixar recursos órfãos.
+  finalizers:
+    - resources-finalizer.argocd.io
+spec:
+  project: dito-internal-api
+  source:
+    repoURL: https://github.com/dito/desafio-devops.git
+    targetRevision: main
+    path: manifests/overlays/staging
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: dito-app
+  syncPolicy:
+    # Sync automático = entrega contínua em staging.
+    automated:
+      prune: true      # remove recursos que saíram do Git.
+      selfHeal: true   # reverte drift feito manualmente no cluster.
+    syncOptions:
+      - CreateNamespace=false # o namespace vem dos manifests.
+      - ApplyOutOfSyncOnly=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m

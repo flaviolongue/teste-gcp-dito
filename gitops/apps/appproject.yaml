@@ -1,0 +1,20 @@
+# AppProject que agrupa as Applications da Dito Internal API e restringe o que
+# elas podem fazer (repos, destinos e tipos de recurso permitidos).
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: dito-internal-api
+  namespace: argocd
+spec:
+  description: "API interna da Dito - staging e production"
+  sourceRepos:
+    - https://github.com/dito/desafio-devops.git
+  destinations:
+    - namespace: dito-app
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"

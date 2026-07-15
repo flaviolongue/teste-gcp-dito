@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dito-api-config
+  namespace: dito-app
+data:
+  APP_ENV: "staging"
+  LOG_LEVEL: "debug"
+  # Connection name real do Cloud SQL de staging (output do Terraform).
+  CLOUD_SQL_CONNECTION_NAME: "dito-staging:southamerica-east1:dito-staging-pg"

@@ -1,0 +1,130 @@
+name: terraform
+
+# Dispara apenas quando há alterações em iac/.
+on:
+  pull_request:
+    paths:
+      - "iac/**"
+      - ".github/workflows/terraform.yml"
+  push:
+    branches: [main]
+    paths:
+      - "iac/**"
+      - ".github/workflows/terraform.yml"
+
+# Autenticação keyless no GCP via Workload Identity Federation (sem chave JSON).
+permissions:
+  contents: read
+  id-token: write # necessário para o OIDC token do WIF.
+  pull-requests: write # para comentar o plan no PR.
+
+concurrency:
+  group: terraform-${{ github.ref }}
+  cancel-in-progress: false # nunca cancelar um apply em andamento.
+
+env:
+  TF_VERSION: "1.9.5"
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # 1) Validação em PRs: fmt + validate + plan para staging e production.
+  # ---------------------------------------------------------------------------
+  validate:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [staging, production]
+    defaults:
+      run:
+        working-directory: iac/environments/${{ matrix.environment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      # Autentica no projeto do ambiente. Os identificadores do WIF ficam em
+      # Environment secrets/vars — nunca em texto no repositório.
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.TF_SERVICE_ACCOUNT }}
+
+      - name: terraform fmt
+        run: terraform fmt -check -recursive -diff
+        working-directory: iac
+
+      - name: terraform init
+        run: terraform init -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}"
+
+      - name: terraform validate
+        run: terraform validate -no-color
+
+      - name: terraform plan
+        id: plan
+        run: terraform plan -no-color -input=false -out=tfplan
+        continue-on-error: true
+
+      - name: Comentar plan no PR
+        uses: actions/github-script@v7
+        env:
+          PLAN_STATUS: ${{ steps.plan.outcome }}
+        with:
+          script: |
+            const body = `#### Terraform Plan — \`${{ matrix.environment }}\`: \`${process.env.PLAN_STATUS}\`
+            <details><summary>Detalhes</summary>
+
+            Rode \`terraform show tfplan\` no runner para o output completo.
+            </details>`;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body
+            });
+
+      - name: Falhar se o plan falhou
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
+
+  # ---------------------------------------------------------------------------
+  # 2) Apply em merge para main.
+  #    - staging: aplica automaticamente.
+  #    - production: exige aprovação manual (GitHub Environment "production"
+  #      configurado com required reviewers).
+  # ---------------------------------------------------------------------------
+  apply:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 1 # staging antes de production.
+      matrix:
+        environment: [staging, production]
+    # O gate de aprovação vem daqui: o Environment "production" no GitHub tem
+    # "Required reviewers". O "staging" não tem, então flui direto.
+    environment: ${{ matrix.environment }}
+    defaults:
+      run:
+        working-directory: iac/environments/${{ matrix.environment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.TF_SERVICE_ACCOUNT }}
+
+      - name: terraform init
+        run: terraform init -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}"
+
+      - name: terraform apply
+        run: terraform apply -auto-approve -input=false

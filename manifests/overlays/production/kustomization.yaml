@@ -1,0 +1,24 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Overlay de PRODUCTION.
+resources:
+  - ../../base
+
+# Em produção usamos tags imutáveis (SHA do commit), nunca "latest".
+# A promoção acontece via PR que altera esta tag (ver README, seção GitOps).
+images:
+  - name: dito-internal-api
+    newName: southamerica-east1-docker.pkg.dev/dito-production/dito-production-docker/dito-internal-api
+    newTag: "REPLACE_WITH_RELEASED_SHA"
+
+# Produção parte de 3 réplicas (HPA pode subir a partir daí).
+replicas:
+  - name: dito-api
+    count: 3
+
+patches:
+  - path: patch-configmap.yaml
+  - path: patch-serviceaccount.yaml
+  - path: patch-externalsecret.yaml
+  - path: patch-hpa.yaml

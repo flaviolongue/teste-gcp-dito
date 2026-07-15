@@ -1,0 +1,30 @@
+# Patch (strategic merge) sobre o argocd-cm que vem no install oficial.
+# Aqui declaramos a URL do ArgoCD e as CONTAS de usuários locais.
+#
+# A senha de cada conta NÃO fica aqui: vai no Secret argocd-secret, com hash
+# bcrypt, aplicado fora do Git (ver gitops/README.md). Em produção, o ideal é
+# desabilitar contas locais e usar SSO (OIDC) via `dex.config`/`oidc.config`.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cm
+data:
+  # URL pública do ArgoCD (usada em links e callbacks de SSO).
+  url: https://argocd.dito.internal
+
+  # Conta local para o time de DevOps (pode logar na UI e gerar API keys).
+  accounts.devops: "apiKey, login"
+  # Conta somente-leitura para quem só precisa observar (ex.: squads de produto).
+  accounts.viewer: "login"
+
+  # Boa prática: manter a conta admin desabilitada depois do bootstrap inicial,
+  # forçando o uso de contas nomeadas/SSO com trilha de auditoria.
+  # admin.enabled: "false"
+
+  # Exemplo de SSO via OIDC (deixado comentado; preencher com o IdP da Dito):
+  # oidc.config: |
+  #   name: Google
+  #   issuer: https://accounts.google.com
+  #   clientID: $oidc.google.clientID
+  #   clientSecret: $oidc.google.clientSecret
+  #   requestedScopes: ["openid", "profile", "email"]

@@ -1,0 +1,12 @@
+# Patch sobre o argocd-cmd-params-cm: parâmetros dos componentes do ArgoCD.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cmd-params-cm
+data:
+  # Habilita o suporte a Applications em múltiplos namespaces, se necessário.
+  # application.namespaces: "argocd,dito-app"
+
+  # TLS é terminado num ingress/load balancer na frente; o server roda em
+  # modo insecure internamente (evita duplo-TLS). Ajustar conforme o ingress.
+  server.insecure: "true"

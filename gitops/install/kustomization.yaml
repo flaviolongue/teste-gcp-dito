@@ -1,0 +1,24 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Todos os recursos vão para o namespace argocd.
+namespace: argocd
+
+resources:
+  - namespace.yaml
+
+  # ---- Instalação do ArgoCD via base REMOTA (pinada por versão) ----
+  # O Kustomize baixa o manifesto oficial de instalação no momento do build.
+  # Manter a versão pinada (não usar "stable"/"HEAD") para builds reprodutíveis.
+  # Para atualizar o ArgoCD, basta bumpar a tag abaixo e revisar o diff.
+  - https://raw.githubusercontent.com/argoproj/argo-cd/v3.4.5/manifests/install.yaml
+
+  # ---- Configuração declarativa que aponta para o nosso repositório ----
+  - repositories.yaml
+
+# Sobrepõe a configuração padrão do ArgoCD (repos, contas, RBAC) por cima da
+# base remota, via strategic merge nos ConfigMaps que já existem no install.
+patches:
+  - path: argocd-cm.yaml
+  - path: argocd-rbac-cm.yaml
+  - path: argocd-cmd-params-cm.yaml

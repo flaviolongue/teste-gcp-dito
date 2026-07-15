@@ -1,0 +1,96 @@
+name: app-build-deploy
+
+# Dispara apenas quando há alterações em app/.
+on:
+  pull_request:
+    paths:
+      - "app/**"
+      - ".github/workflows/app.yml"
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - ".github/workflows/app.yml"
+
+permissions:
+  contents: write # para dar commit da nova tag no overlay de staging (GitOps).
+  id-token: write # WIF (keyless) para autenticar no Artifact Registry.
+
+concurrency:
+  group: app-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGION: southamerica-east1
+  # Registry de STAGING. A promoção para produção é feita depois, via PR no
+  # overlay de production (ver gitops/README.md).
+  REGISTRY: southamerica-east1-docker.pkg.dev/dito-staging/dito-staging-docker
+  IMAGE: dito-internal-api
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Tag imutável = SHA curto do commit. Nunca "latest" para deploy.
+      - name: Definir tag da imagem
+        id: meta
+        run: echo "tag=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Autenticar no GCP (WIF, keyless)
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.APP_DEPLOYER_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configurar Docker para o Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Build da imagem
+        run: |
+          docker build -t "$REGISTRY/$IMAGE:${{ steps.meta.outputs.tag }}" ./app
+
+      # Em PRs apenas valida o build; o push só ocorre em merge para main.
+      - name: Push da imagem
+        if: github.event_name == 'push'
+        run: |
+          # Caso não haja registry disponível no ambiente de avaliação, estes
+          # comandos podem ser simulados — a lógica da pipeline é a mesma.
+          docker push "$REGISTRY/$IMAGE:${{ steps.meta.outputs.tag }}"
+
+  # Fecha o loop GitOps: atualiza a tag no overlay de STAGING e dá commit.
+  # O ArgoCD de staging (sync automático) aplica a mudança no cluster.
+  bump-staging:
+    needs: build-push
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITOPS_PAT }} # PAT com escopo mínimo para dar push.
+
+      - name: Definir tag
+        id: meta
+        run: echo "tag=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Instalar kustomize
+        run: |
+          curl -sfLo /tmp/k.tar.gz https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.4.3/kustomize_v5.4.3_linux_amd64.tar.gz
+          tar -xzf /tmp/k.tar.gz -C /usr/local/bin
+
+      - name: Atualizar tag no overlay de staging
+        working-directory: manifests/overlays/staging
+        run: |
+          kustomize edit set image "$IMAGE=$REGISTRY/$IMAGE:${{ steps.meta.outputs.tag }}"
+
+      - name: Commit da promoção para staging
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add manifests/overlays/staging/kustomization.yaml
+          git commit -m "chore(staging): deploy ${IMAGE}:${{ steps.meta.outputs.tag }} [skip ci]" || echo "sem mudanças"
+          git push

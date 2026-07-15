@@ -1,0 +1,25 @@
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+*.tfplan
+tfplan
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+# Nunca commitar tfvars com segredos reais (os do repo são de exemplo)
+*.auto.tfvars
+
+# Credenciais
+*.json.key
+*-key.json
+service-account*.json
+
+# Sistema
+.DS_Store

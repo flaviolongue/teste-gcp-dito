@@ -1,0 +1,9 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: dito-api
+  namespace: dito-app
+spec:
+  # Produção tem mais headroom de escala.
+  minReplicas: 3
+  maxReplicas: 12

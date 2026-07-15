@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dito-app
+  labels:
+    app.kubernetes.io/part-of: dito-internal-api
+    # Habilita os padrões de segurança de Pod (restrito) no namespace.
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted

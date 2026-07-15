@@ -1,0 +1,31 @@
+# Patch sobre o argocd-rbac-cm: define os PAPÉIS e liga os usuários a eles.
+#
+# Reforça o gate de produção também no RBAC: o sync manual de produção só é
+# permitido a quem tem o papel "prod-approver". Ou seja, além da Application de
+# produção não ter auto-sync, nem todo mundo consegue apertar o "Sync".
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-rbac-cm
+data:
+  # Quem não casar com nenhuma regra fica somente-leitura.
+  policy.default: role:readonly
+  scopes: "[groups, email]"
+
+  policy.csv: |
+    # ---- Papel devops: opera tudo em staging + gerencia as Applications ----
+    p, role:devops, applications, get, dito-internal-api/*, allow
+    p, role:devops, applications, sync, dito-internal-api/dito-api-staging, allow
+    p, role:devops, applications, action/*, dito-internal-api/dito-api-staging, allow
+    p, role:devops, applications, override, dito-internal-api/dito-api-staging, allow
+    p, role:devops, repositories, get, *, allow
+
+    # ---- Papel prod-approver: ÚNICO que pode dar Sync em produção (o gate) ----
+    p, role:prod-approver, applications, sync, dito-internal-api/dito-api-production, allow
+    p, role:prod-approver, applications, get, dito-internal-api/*, allow
+
+    # ---- Ligação usuário -> papel ----
+    g, devops, role:devops
+    # A conta que aprova produção deve ser adicionada explicitamente aqui:
+    # g, tech-lead, role:prod-approver
+    g, viewer, role:readonly

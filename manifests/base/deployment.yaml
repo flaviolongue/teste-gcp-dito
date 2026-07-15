@@ -1,0 +1,140 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dito-api
+  namespace: dito-app
+  labels:
+    app.kubernetes.io/name: dito-api
+    app.kubernetes.io/part-of: dito-internal-api
+spec:
+  # Réplicas base; overlays ajustam por ambiente. Mínimo de 2 para HA.
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: dito-api
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0 # não derruba capacidade durante o rollout.
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: dito-api
+        app.kubernetes.io/part-of: dito-internal-api
+    spec:
+      serviceAccountName: dito-api
+      # Não montar o token da SA por padrão em cada Pod desnecessariamente.
+      automountServiceAccountToken: true
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        fsGroup: 101
+        seccompProfile:
+          type: RuntimeDefault
+
+      # Distribui as réplicas entre zonas diferentes (multi-zone). Se uma zona
+      # cair, réplicas nas outras zonas continuam servindo.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: dito-api
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: dito-api
+
+      containers:
+        # ---- Container da aplicação ----
+        - name: app
+          image: dito-internal-api:placeholder # substituído pelo overlay/CI.
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: dito-api-config
+          env:
+            # Variáveis sensíveis vindas do Secret gerado pelo ESO.
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: dito-api-secrets
+                  key: DB_PASSWORD
+            - name: APP_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: dito-api-secrets
+                  key: APP_API_KEY
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            # nginx precisa escrever cache/temp; montamos emptyDir por causa do
+            # readOnlyRootFilesystem.
+            - name: nginx-cache
+              mountPath: /var/cache/nginx
+            - name: tmp
+              mountPath: /tmp
+
+        # ---- Sidecar: Cloud SQL Auth Proxy ----
+        # Faz o túnel seguro (IAM + TLS) até o Cloud SQL. A app conecta em
+        # 127.0.0.1:5432 sem precisar de IP/credencial do banco no código.
+        - name: cloud-sql-proxy
+          image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.11.0
+          args:
+            - "--private-ip"
+            - "--structured-logs"
+            - "--port=5432"
+            - "$(CLOUD_SQL_CONNECTION_NAME)"
+          env:
+            - name: CLOUD_SQL_CONNECTION_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: dito-api-config
+                  key: CLOUD_SQL_CONNECTION_NAME
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+
+      volumes:
+        - name: nginx-cache
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}

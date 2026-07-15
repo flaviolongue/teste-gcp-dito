@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dito-api-config
+  namespace: dito-app
+# Variáveis de ambiente NÃO sensíveis. Valores específicos de cada ambiente
+# são sobrescritos pelos overlays (staging/production).
+data:
+  APP_ENV: "base"
+  LOG_LEVEL: "info"
+  # O app conecta no Cloud SQL através do sidecar cloud-sql-auth-proxy,
+  # que escuta em localhost. Por isso DB_HOST é 127.0.0.1.
+  DB_HOST: "127.0.0.1"
+  DB_PORT: "5432"
+  DB_NAME: "app"
+  DB_USER: "app"
+  # Connection name do Cloud SQL (project:region:instance) usado pelo sidecar
+  # cloud-sql-proxy. Valor real vem do output do Terraform, ajustado no overlay.
+  CLOUD_SQL_CONNECTION_NAME: "PLACEHOLDER_PROJECT:southamerica-east1:PLACEHOLDER_INSTANCE"

@@ -1,0 +1,23 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Overlay de STAGING.
+resources:
+  - ../../base
+
+# Tag da imagem para staging. Atualizada automaticamente pela pipeline (app.yml)
+# a cada merge em app/. O host/projeto reais vêm do Artifact Registry.
+images:
+  - name: dito-internal-api
+    newName: southamerica-east1-docker.pkg.dev/dito-staging/dito-staging-docker/dito-internal-api
+    newTag: latest
+
+# Staging pode rodar com 2 réplicas (mínimo para HA multi-zona).
+replicas:
+  - name: dito-api
+    count: 2
+
+patches:
+  - path: patch-configmap.yaml
+  - path: patch-serviceaccount.yaml
+  - path: patch-externalsecret.yaml

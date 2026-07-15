@@ -1,0 +1,52 @@
+# NetworkPolicy de menor privilégio: por padrão nega tudo e libera só o
+# necessário. Requer um CNI que suporte NetworkPolicy (no GKE, Dataplane V2).
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: dito-app
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dito-api
+  namespace: dito-app
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: dito-api
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Aceita tráfego HTTP de outros Pods do cluster (serviços internos da Dito).
+    - from:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    # DNS interno do cluster.
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Saída para o Cloud SQL (IP privado) e APIs Google (Secret Manager).
+    # Mantido amplo aqui por simplicidade; em produção restringir aos CIDRs.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 5432

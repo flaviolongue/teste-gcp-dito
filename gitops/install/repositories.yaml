@@ -1,0 +1,17 @@
+# Registro DECLARATIVO do repositório Git que o ArgoCD vai observar.
+# É um Secret com a label especial que o ArgoCD reconhece como "repository".
+#
+# Este repo é público no exemplo, então NÃO carrega credencial. Para um repo
+# privado, adicione `password`/`sshPrivateKey` a partir de outro Secret gerido
+# fora do Git (SealedSecrets, ESO, ou `argocd repo add`), NUNCA em texto aqui.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: repo-desafio-devops
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+stringData:
+  type: git
+  name: desafio-devops
+  url: https://github.com/dito/desafio-devops.git
