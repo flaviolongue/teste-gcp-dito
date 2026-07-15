@@ -4,19 +4,19 @@ kind: Kustomization
 # Overlay de DEVELOPER (projeto Teste-dito, cluster zonal).
 
 resources:
-  - ../../base
+- ../../base
 
 images:
-  - name: dito-internal-api
-    newName: southamerica-east1-docker.pkg.dev/project-4a372108-be7a-4159-966/dito-developer-docker/dito-internal-api
-    newTag: latest
+- name: dito-internal-api
+  newName: southamerica-east1-docker.pkg.dev/project-4a372108-be7a-4159-966/dito-developer-docker/dito-internal-api
+  newTag: f092f77
 
 replicas:
-  - name: dito-api
-    count: 2
+- count: 2
+  name: dito-api
 
 patches:
-  - path: patch-configmap.yaml
-  - path: patch-httproute.yaml
-  - path: patch-serviceaccount.yaml
-  - path: patch-externalsecret.yaml
+- path: patch-configmap.yaml
+- path: patch-httproute.yaml
+- path: patch-serviceaccount.yaml
+- path: patch-externalsecret.yaml
