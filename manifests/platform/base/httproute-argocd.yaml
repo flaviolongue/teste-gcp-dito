@@ -14,8 +14,14 @@ metadata:
   name: argocd-server
   namespace: argocd
 spec:
+  # group/kind/weight são declarados explicitamente (mesmo sendo defaults da
+  # API) para que o manifesto bata exatamente com o objeto armazenado. Sem isso,
+  # o API server preenche os defaults e o ArgoCD (com ServerSideApply) enxerga
+  # diferença, deixando a Application eternamente OutOfSync.
   parentRefs:
-    - name: dito-gateway
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: dito-gateway
       namespace: tools
       sectionName: http
   hostnames:
@@ -26,5 +32,8 @@ spec:
             type: PathPrefix
             value: /
       backendRefs:
-        - name: argocd-server
+        - group: ""
+          kind: Service
+          name: argocd-server
           port: 80
+          weight: 1

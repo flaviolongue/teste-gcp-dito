@@ -12,8 +12,12 @@ metadata:
   name: dito-api
   namespace: apps
 spec:
+  # group/kind/weight explícitos (mesmo sendo defaults da API) para o manifesto
+  # bater exatamente com o objeto armazenado e não gerar drift no ArgoCD.
   parentRefs:
-    - name: dito-gateway
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: dito-gateway
       namespace: tools
       sectionName: http
   hostnames:
@@ -24,5 +28,8 @@ spec:
             type: PathPrefix
             value: /
       backendRefs:
-        - name: dito-api
+        - group: ""
+          kind: Service
+          name: dito-api
           port: 80
+          weight: 1
