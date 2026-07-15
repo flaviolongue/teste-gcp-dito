@@ -5,4 +5,4 @@ metadata:
   namespace: argocd
 spec:
   hostnames:
-    - argocd-staging.dito.dev4cloud.online
+    - argocd-staging-dito.dev4cloud.online

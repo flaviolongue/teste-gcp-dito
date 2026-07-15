@@ -5,4 +5,4 @@ metadata:
   namespace: apps
 spec:
   hostnames:
-    - app-production.dito.dev4cloud.online
+    - app-production-dito.dev4cloud.online

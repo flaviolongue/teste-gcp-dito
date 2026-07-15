@@ -5,4 +5,4 @@ metadata:
   namespace: apps
 spec:
   hostnames:
-    - app-staging.dito.dev4cloud.online
+    - app-staging-dito.dev4cloud.online
