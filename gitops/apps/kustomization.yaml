@@ -9,5 +9,6 @@ resources:
   - appproject.yaml
   - appproject-addons.yaml
   - application-external-secrets.yaml
+  - application-developer.yaml
   - application-staging.yaml
   - application-production.yaml

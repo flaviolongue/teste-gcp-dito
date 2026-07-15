@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dito-api-config
+  namespace: dito-app
+data:
+  APP_ENV: "developer"
+  LOG_LEVEL: "debug"
+  CLOUD_SQL_CONNECTION_NAME: "project-4a372108-be7a-4159-966:southamerica-east1:dito-developer-pg"

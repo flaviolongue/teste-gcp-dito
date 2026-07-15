@@ -12,7 +12,7 @@ metadata:
 spec:
   project: dito-internal-api
   source:
-    repoURL: https://github.com/dito/desafio-devops.git
+    repoURL: https://github.com/flaviolongue/teste-gcp-dito.git
     targetRevision: main
     path: manifests/overlays/staging
   destination:

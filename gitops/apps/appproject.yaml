@@ -8,7 +8,7 @@ metadata:
 spec:
   description: "API interna da Dito - staging e production"
   sourceRepos:
-    - https://github.com/dito/desafio-devops.git
+    - https://github.com/flaviolongue/teste-gcp-dito.git
   destinations:
     - namespace: dito-app
       server: https://kubernetes.default.svc
