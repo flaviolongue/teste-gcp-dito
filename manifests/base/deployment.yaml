@@ -96,10 +96,12 @@ spec:
             capabilities:
               drop: ["ALL"]
           volumeMounts:
-            # nginx precisa escrever cache/temp; montamos emptyDir por causa do
-            # readOnlyRootFilesystem.
+            # Com readOnlyRootFilesystem, todo caminho que o nginx escreve
+            # precisa de um volume gravável:
             - name: nginx-cache
-              mountPath: /var/cache/nginx
+              mountPath: /var/cache/nginx # cache/proxy temp
+            - name: run
+              mountPath: /run # nginx.pid (pid /run/nginx.pid)
             - name: tmp
               mountPath: /tmp
 
@@ -135,6 +137,8 @@ spec:
 
       volumes:
         - name: nginx-cache
+          emptyDir: {}
+        - name: run
           emptyDir: {}
         - name: tmp
           emptyDir: {}

@@ -12,11 +12,12 @@ RUN rm /etc/nginx/conf.d/default.conf
 COPY nginx.conf /etc/nginx/conf.d/app.conf
 COPY html/ /usr/share/nginx/html/
 
-# Ajusta permissões para o usuário não-root conseguir escrever os arquivos
-# temporários e o pid em runtime.
+# Ajusta permissões para o usuário não-root.
+# Os caminhos que o nginx precisa escrever em runtime (/var/cache/nginx, /run
+# para o nginx.pid, e /tmp) recebem volumes emptyDir no Deployment, porque o
+# Pod roda com readOnlyRootFilesystem: true.
 RUN chown -R nginx:nginx /usr/share/nginx/html \
-    && chown -R nginx:nginx /var/cache/nginx \
-    && touch /tmp/nginx.pid && chown nginx:nginx /tmp/nginx.pid
+    && chown -R nginx:nginx /var/cache/nginx
 
 USER nginx
 
