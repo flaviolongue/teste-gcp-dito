@@ -15,6 +15,16 @@ output "gke_location" {
   value       = module.gke.location
 }
 
+output "gateway_ip" {
+  description = "IP estático global do Gateway — aponte o A record do DNS para ele."
+  value       = var.create_gateway_ip ? google_compute_global_address.gateway[0].address : null
+}
+
+output "gateway_ip_name" {
+  description = "Nome do IP estático — referenciado pelo Gateway (NamedAddress)."
+  value       = var.create_gateway_ip ? google_compute_global_address.gateway[0].name : null
+}
+
 output "gke_get_credentials_command" {
   description = "Comando pronto para obter as credenciais do cluster."
   # --location funciona tanto para cluster regional quanto zonal (ao contrário

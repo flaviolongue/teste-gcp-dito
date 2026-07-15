@@ -1,0 +1,10 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: dito-gateway
+  namespace: tools
+spec:
+  addresses:
+    # Nome do IP estático global reservado pelo Terraform neste ambiente.
+    - type: NamedAddress
+      value: dito-production-gateway-ip

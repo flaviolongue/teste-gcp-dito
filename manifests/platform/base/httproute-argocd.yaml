@@ -1,0 +1,30 @@
+# HTTPRoute da UI do ArgoCD.
+#
+# Fica no namespace "argocd" (mesmo do Service argocd-server), então o
+# backendRef é local — sem necessidade de ReferenceGrant.
+# Aponta para o Gateway em "tools".
+#
+# O argocd-server roda com server.insecure=true (ver gitops/install/
+# argocd-cmd-params-cm.yaml), então serve HTTP na porta 80 — sem duplo-TLS.
+#
+# O hostname muda por ambiente e é ajustado no overlay.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: argocd-server
+  namespace: argocd
+spec:
+  parentRefs:
+    - name: dito-gateway
+      namespace: tools
+      sectionName: http
+  hostnames:
+    - PLACEHOLDER_ARGOCD_HOSTNAME
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: argocd-server
+          port: 80

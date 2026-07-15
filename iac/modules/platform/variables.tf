@@ -71,6 +71,18 @@ variable "gke_spot" {
   default     = false
 }
 
+variable "create_gateway_ip" {
+  description = "Reserva um IP estático GLOBAL para o Gateway (Application LB). É o IP apontado no DNS."
+  type        = bool
+  default     = true
+}
+
+variable "gateway_api_channel" {
+  description = "Habilita o Gateway API gerenciado do GKE (CHANNEL_STANDARD) ou desliga (CHANNEL_DISABLED). O controller roda no control plane do Google — não sobe pod no cluster."
+  type        = string
+  default     = "CHANNEL_STANDARD"
+}
+
 variable "gke_machine_type" {
   description = "Tipo de máquina dos nós do GKE."
   type        = string

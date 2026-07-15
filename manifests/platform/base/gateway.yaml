@@ -1,0 +1,28 @@
+# Gateway = o Application Load Balancer do Google.
+#
+# O gatewayClass "gke-l7-global-external-managed" faz o GKE provisionar um
+# Application LB GLOBAL. O controller roda no control plane do Google — nenhum
+# pod sobe no cluster, e o tráfego vai do LB direto para os Pods (via NEG).
+#
+# addresses: referencia o IP estático global reservado no Terraform, PELO NOME.
+# allowedRoutes.from: All permite que HTTPRoutes de outros namespaces (apps,
+# argocd) se anexem a este Gateway — é isso que dá "1 LB para vários namespaces".
+#
+# O nome do IP muda por ambiente e é ajustado no overlay.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: dito-gateway
+  namespace: tools
+spec:
+  gatewayClassName: gke-l7-global-external-managed
+  addresses:
+    - type: NamedAddress
+      value: PLACEHOLDER_IP_NAME
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+      allowedRoutes:
+        namespaces:
+          from: All

@@ -91,6 +91,11 @@ module "gke" {
   deletion_protection      = var.deletion_protection
   remove_default_node_pool = true
 
+  # Gateway API gerenciado: o Google instala os CRDs e reconcilia Gateway/
+  # HTTPRoute no control plane, provisionando um Application Load Balancer.
+  # Não sobe nenhum pod de controller no cluster.
+  gateway_api_channel = var.gateway_api_channel
+
   node_pools = [{
     name         = "primary"
     machine_type = var.gke_machine_type
@@ -109,6 +114,19 @@ module "gke" {
   node_pools_labels = {
     all = { env = var.environment }
   }
+}
+
+# --- IP estático do Gateway (Application LB) --------------------------------
+# IP GLOBAL porque o gatewayClass gke-l7-global-external-managed provisiona um
+# Application LB global. É este IP que recebe o A record no DNS (Cloudflare).
+# O Gateway referencia o IP pelo NOME (NamedAddress), não pelo valor.
+resource "google_compute_global_address" "gateway" {
+  count        = var.create_gateway_ip ? 1 : 0
+  name         = "${local.name_prefix}-gateway-ip"
+  project      = var.project_id
+  address_type = "EXTERNAL"
+
+  depends_on = [google_project_service.apis]
 }
 
 # --- Workload Identity: GSA da app + binding com a KSA (sem chave) -----------

@@ -1,0 +1,9 @@
+# Namespace das ferramentas de cluster (Gateway, External Secrets Operator...).
+# Sem Pod Security "restricted": operadores costumam precisar de mais permissões
+# que a app; o restricted fica só no namespace "apps".
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tools
+  labels:
+    app.kubernetes.io/part-of: platform

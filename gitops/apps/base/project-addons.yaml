@@ -11,6 +11,7 @@ spec:
   description: "Add-ons de cluster (ESO, etc.) via GitOps"
   sourceRepos:
     - https://charts.external-secrets.io
+    - https://github.com/flaviolongue/teste-gcp-dito.git
   destinations:
     - namespace: "*"
       server: https://kubernetes.default.svc

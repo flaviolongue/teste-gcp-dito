@@ -17,5 +17,6 @@ replicas:
 
 patches:
   - path: patch-configmap.yaml
+  - path: patch-httproute.yaml
   - path: patch-serviceaccount.yaml
   - path: patch-externalsecret.yaml

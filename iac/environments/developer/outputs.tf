@@ -8,6 +8,16 @@ output "gke_location" {
   value       = module.platform.gke_location
 }
 
+output "gateway_ip" {
+  description = "IP estático global do Gateway — aponte os A records do Cloudflare para ele."
+  value       = module.platform.gateway_ip
+}
+
+output "gateway_ip_name" {
+  description = "Nome do IP estático, referenciado pelo Gateway."
+  value       = module.platform.gateway_ip_name
+}
+
 output "gke_get_credentials_command" {
   description = "Comando para configurar o kubeconfig deste cluster."
   value       = module.platform.gke_get_credentials_command

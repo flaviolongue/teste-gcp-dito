@@ -1,0 +1,28 @@
+# Plataforma do cluster developer: namespace tools, Gateway (Application LB) e a rota
+# da UI do ArgoCD. sync-wave 0 — o Gateway precisa existir antes dos HTTPRoutes
+# da app (wave 1) se anexarem a ele.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform-developer
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.io
+spec:
+  project: cluster-addons
+  source:
+    repoURL: https://github.com/flaviolongue/teste-gcp-dito.git
+    targetRevision: main
+    path: manifests/platform/overlays/developer
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: tools
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true
