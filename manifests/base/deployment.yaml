@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: dito-api
-  namespace: dito-app
+  namespace: apps
   labels:
     app.kubernetes.io/name: dito-api
     app.kubernetes.io/part-of: dito-internal-api

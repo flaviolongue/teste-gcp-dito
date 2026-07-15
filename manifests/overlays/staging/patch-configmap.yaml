@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: dito-api-config
-  namespace: dito-app
+  namespace: apps
 data:
   APP_ENV: "staging"
   LOG_LEVEL: "debug"

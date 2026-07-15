@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: dito-api-config
-  namespace: dito-app
+  namespace: apps
 # Variáveis de ambiente NÃO sensíveis. Valores específicos de cada ambiente
 # são sobrescritos pelos overlays (staging/production).
 data:

@@ -2,7 +2,7 @@ apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: dito-api
-  namespace: dito-app
+  namespace: apps
 spec:
   # Garante que pelo menos 1 réplica siga rodando durante disrupções
   # voluntárias (drain de nó, upgrade do cluster).

@@ -112,7 +112,7 @@ variable "db_disk_size" {
 variable "k8s_namespace" {
   description = "Namespace onde a aplicação roda."
   type        = string
-  default     = "dito-app"
+  default     = "apps"
 }
 
 variable "k8s_service_account" {

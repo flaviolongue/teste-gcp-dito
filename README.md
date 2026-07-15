@@ -242,6 +242,20 @@ Ver seção dedicada abaixo. Em resumo: a fonte da verdade é o Secret Manager; 
 ESO materializa um `Secret` do Kubernetes; o Pod consome como env. Nenhum
 segredo em texto plano no Git.
 
+### Namespaces: **`apps` / `argocd` / `tools`**
+
+| Namespace | O que roda |
+|---|---|
+| `apps` | as aplicações (Deployment, Service, KSA, ExternalSecret) |
+| `argocd` | o ArgoCD |
+| `tools` | ferramentas de cluster (External Secrets Operator, etc.) |
+
+O namespace da aplicação **não** carrega o nome do ambiente (não é
+`developer`/`staging`/`production`): como o modelo é **um cluster por ambiente**,
+o próprio cluster já define o ambiente — repetir isso no namespace seria
+redundante e criaria complexidade sem ganho. O mesmo manifesto vale em qualquer
+cluster; o que muda é o overlay (imagem, projeto, secrets).
+
 ### GitOps: **ArgoCD + overlays por diretório**
 Escolhi **ArgoCD** (vs FluxCD) pela UI/RBAC madura para o requisito de
 **aprovação manual em produção**, e **promoção por overlay/diretório** (vs

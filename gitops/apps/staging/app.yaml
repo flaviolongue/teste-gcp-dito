@@ -16,7 +16,7 @@ spec:
     path: manifests/overlays/staging
   destination:
     server: https://kubernetes.default.svc
-    namespace: dito-app
+    namespace: apps
   syncPolicy:
     automated:
       prune: true

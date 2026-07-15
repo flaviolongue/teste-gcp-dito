@@ -5,7 +5,7 @@ metadata:
   name: argocd-cmd-params-cm
 data:
   # Habilita o suporte a Applications em múltiplos namespaces, se necessário.
-  # application.namespaces: "argocd,dito-app"
+  # application.namespaces: "argocd,apps"
 
   # TLS é terminado num ingress/load balancer na frente; o server roda em
   # modo insecure internamente (evita duplo-TLS). Ajustar conforme o ingress.

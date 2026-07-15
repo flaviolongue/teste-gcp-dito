@@ -1,7 +1,10 @@
+# Namespace das aplicações. É o mesmo em todos os clusters — o CLUSTER já
+# define o ambiente (um cluster por ambiente), então não faz sentido repetir o
+# nome do ambiente aqui.
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: dito-app
+  name: apps
   labels:
     app.kubernetes.io/part-of: dito-internal-api
     # Habilita os padrões de segurança de Pod (restrito) no namespace.

@@ -50,7 +50,7 @@ Modelo escolhido: **um ArgoCD por cluster**. Cada cluster registra só o seu
 ambiente. O `apps/developer` referencia apenas a Application `dito-api-developer`
 — então o ArgoCD do cluster developer **nunca** tenta deployar os overlays de
 staging/production. Isso evita conflito (todos os overlays miram o mesmo
-namespace `dito-app`) e mantém o blast-radius por cluster.
+namespace `apps`) e mantém o blast-radius por cluster.
 
 A `base/` (AppProjects + ESO) é compartilhada via Kustomize entre os três
 ambientes, evitando duplicação; só a Application da app muda por ambiente.

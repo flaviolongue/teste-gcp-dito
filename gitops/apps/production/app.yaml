@@ -18,7 +18,7 @@ spec:
     path: manifests/overlays/production
   destination:
     server: https://kubernetes.default.svc
-    namespace: dito-app
+    namespace: apps
   syncPolicy:
     # Sem `automated`: sync só por ação humana (o gate de produção).
     syncOptions:
