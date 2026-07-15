@@ -1,0 +1,32 @@
+# Application da app em DEVELOPER (sync automático). sync-wave 1: depois do ESO.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dito-api-developer
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.io
+spec:
+  project: dito-internal-api
+  source:
+    repoURL: https://github.com/flaviolongue/teste-gcp-dito.git
+    targetRevision: main
+    path: manifests/overlays/developer
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: dito-app
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ApplyOutOfSyncOnly=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m

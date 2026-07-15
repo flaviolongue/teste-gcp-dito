@@ -1,0 +1,26 @@
+# Root Application (app-of-apps) do cluster DEVELOPER.
+# Aponta para gitops/apps/developer, que contém APENAS o que este cluster deve
+# rodar (AppProjects + ESO + app de developer). Assim o ArgoCD deste cluster
+# não registra staging/production.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: developer-root
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/flaviolongue/teste-gcp-dito.git
+    targetRevision: main
+    path: gitops/apps/developer
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true

@@ -1,11 +1,12 @@
-# AppProject para ADD-ONS de cluster gerenciados via GitOps (ex.: External
-# Secrets Operator). Separado do project da aplicação porque add-ons instalam
-# CRDs e recursos cluster-scoped, e vêm de repositórios Helm externos.
+# AppProject dos add-ons de cluster (ESO). Add-ons instalam CRDs e recursos
+# cluster-scoped e vêm de repositórios Helm externos.
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
 metadata:
   name: cluster-addons
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
 spec:
   description: "Add-ons de cluster (ESO, etc.) via GitOps"
   sourceRepos:
@@ -13,7 +14,6 @@ spec:
   destinations:
     - namespace: "*"
       server: https://kubernetes.default.svc
-  # Add-ons precisam criar CRDs e outros recursos cluster-scoped.
   clusterResourceWhitelist:
     - group: "*"
       kind: "*"

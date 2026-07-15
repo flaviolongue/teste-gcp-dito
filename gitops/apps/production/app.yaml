@@ -1,11 +1,13 @@
-# Application de DEVELOPER.
-# Sync automático (como dev/staging): commits no overlay developer são
-# aplicados sozinhos no cluster.
+# Application da app em PRODUCTION.
+# Sync MANUAL (sem bloco `automated`): o ArgoCD detecta o drift mas espera
+# aprovação humana (Sync). É o gate de produção.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: dito-api-developer
+  name: dito-api-production
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
   finalizers:
     - resources-finalizer.argocd.io
 spec:
@@ -13,20 +15,18 @@ spec:
   source:
     repoURL: https://github.com/flaviolongue/teste-gcp-dito.git
     targetRevision: main
-    path: manifests/overlays/developer
+    path: manifests/overlays/production
   destination:
     server: https://kubernetes.default.svc
     namespace: dito-app
   syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
+    # Sem `automated`: sync só por ação humana (o gate de produção).
     syncOptions:
       - CreateNamespace=false
       - ApplyOutOfSyncOnly=true
     retry:
-      limit: 5
+      limit: 3
       backoff:
-        duration: 10s
+        duration: 15s
         factor: 2
-        maxDuration: 3m
+        maxDuration: 5m

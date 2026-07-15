@@ -1,12 +1,11 @@
-# Application de STAGING.
-# Sincronização AUTOMÁTICA: todo commit em manifests/overlays/staging na branch
-# main é aplicado sozinho no cluster de staging, sem intervenção humana.
+# Application da app em STAGING (sync automático). sync-wave 1: depois do ESO.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: dito-api-staging
   namespace: argocd
-  # Impede a exclusão acidental da Application deixar recursos órfãos.
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
   finalizers:
     - resources-finalizer.argocd.io
 spec:
@@ -19,12 +18,11 @@ spec:
     server: https://kubernetes.default.svc
     namespace: dito-app
   syncPolicy:
-    # Sync automático = entrega contínua em staging.
     automated:
-      prune: true      # remove recursos que saíram do Git.
-      selfHeal: true   # reverte drift feito manualmente no cluster.
+      prune: true
+      selfHeal: true
     syncOptions:
-      - CreateNamespace=false # o namespace vem dos manifests.
+      - CreateNamespace=false
       - ApplyOutOfSyncOnly=true
     retry:
       limit: 5

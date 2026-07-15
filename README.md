@@ -392,11 +392,12 @@ acesso ao cluster, então rodam rápido e sem credenciais sensíveis.
   bastion/túnel ou runners dentro da VPC.
 - **State remoto "simulado":** o backend GCS está configurado mas depende do
   bucket do bootstrap existir; nada é aplicado de verdade (conforme o desafio).
-- **ArgoCD** é instalado de forma declarativa via Kustomize (base remota pinada)
-  em [`gitops/install/`](gitops/) — ver `make bootstrap`. Já o **External Secrets
-  Operator (ESO)** ainda é pré-requisito do cluster e não é instalado aqui; eu o
-  adicionaria como uma Application do ArgoCD (do tipo Helm) no mesmo modelo
-  app-of-apps.
+- **ArgoCD e ESO via GitOps:** o ArgoCD é instalado pelo Terraform (stack
+  `iac/environments/<env>-bootstrap`, provider `kbst/kustomization`) a partir de
+  `gitops/clusters/<env>`, que já registra o **root app-of-apps** do cluster. O
+  **External Secrets Operator** é gerenciado pelo próprio ArgoCD (Application
+  Helm em `gitops/apps/base`). Modelo: **um ArgoCD por cluster** — cada cluster
+  registra apenas as Applications do seu ambiente.
 - **Sem testes de aplicação real:** a app é um nginx de exemplo; a esteira é o
   foco. Migrations de banco (ex.: um Job/initContainer) não estão modeladas.
 - **Custo:** as configs de produção (GKE regional + Cloud SQL HA) têm custo

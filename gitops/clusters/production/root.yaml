@@ -1,0 +1,26 @@
+# Root Application (app-of-apps) do cluster PRODUCTION.
+# Nota: o root aqui sincroniza automaticamente as DEFINIÇÕES (a Application de
+# produção existir), mas a Application da app em si é MANUAL — ou seja, o deploy
+# do workload de produção ainda exige aprovação humana (Sync).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: production-root
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/flaviolongue/teste-gcp-dito.git
+    targetRevision: main
+    path: gitops/apps/production
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true

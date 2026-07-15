@@ -51,6 +51,8 @@ provider "kustomization" {
 }
 
 module "argocd" {
-  source         = "../../modules/argocd"
-  manifests_path = "${path.root}/../../../gitops/install"
+  source = "../../modules/argocd"
+  # Path por-cluster: instala o ArgoCD + registra o root app-of-apps do
+  # developer (que puxa só as apps deste cluster).
+  manifests_path = "${path.root}/../../../gitops/clusters/developer"
 }

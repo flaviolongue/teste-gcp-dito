@@ -1,12 +1,14 @@
-# AppProject que agrupa as Applications da Dito Internal API e restringe o que
-# elas podem fazer (repos, destinos e tipos de recurso permitidos).
+# AppProject da aplicação. sync-wave -1 garante que ele exista antes das
+# Applications que o referenciam.
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
 metadata:
   name: dito-internal-api
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
 spec:
-  description: "API interna da Dito - staging e production"
+  description: "API interna da Dito"
   sourceRepos:
     - https://github.com/flaviolongue/teste-gcp-dito.git
   destinations:

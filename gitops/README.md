@@ -1,114 +1,100 @@
 # gitops/
 
-Instalação e configuração do ArgoCD **via Kustomize** (base remota + overlay de
-config) e as Applications que ele gerencia.
+Configuração GitOps (ArgoCD) no modelo **app-of-apps por cluster**: cada cluster
+tem seu próprio ArgoCD, que registra **apenas** as Applications daquele ambiente.
 
 ```
 gitops/
-├── install/                       # instala + configura o ArgoCD (via Kustomize)
-│   ├── kustomization.yaml         #   base REMOTA pinada (install.yaml oficial) + patches
-│   ├── namespace.yaml
+├── install/                       # ArgoCD via Kustomize (base remota oficial pinada + config)
+│   ├── kustomization.yaml         #   resources: install.yaml v3.4.5 + patches
 │   ├── repositories.yaml          #   Secret "repository" apontando p/ o repo Git
-│   ├── argocd-cm.yaml             #   URL + contas de usuários (devops, viewer)
-│   ├── argocd-rbac-cm.yaml        #   papéis e RBAC (gate de sync de produção)
-│   └── argocd-cmd-params-cm.yaml  #   parâmetros dos componentes
-├── apps/                          # o que o ArgoCD gerencia (aplicado após o install)
-│   ├── kustomization.yaml
-│   ├── appproject.yaml            #   AppProject (restringe repos/destinos)
-│   ├── application-staging.yaml   #   sync AUTOMÁTICO -> cluster de staging
-│   └── application-production.yaml#   sync MANUAL (aprovação) -> cluster de produção
-└── Makefile                       # bootstrap em duas fases
+│   ├── argocd-cm.yaml             #   URL + contas de usuários
+│   ├── argocd-rbac-cm.yaml        #   papéis/RBAC (gate de sync de produção)
+│   └── ...
+├── apps/
+│   ├── base/                      # comum a todo cluster (DRY)
+│   │   ├── project.yaml           #   AppProject da app
+│   │   ├── project-addons.yaml    #   AppProject dos add-ons
+│   │   └── external-secrets.yaml  #   Application do ESO (Helm)
+│   ├── developer/                 # base + Application da app (developer)
+│   ├── staging/                   # base + Application da app (staging)
+│   └── production/                # base + Application da app (production, sync manual)
+└── clusters/
+    ├── developer/                 # install + root app-of-apps  ← Terraform aplica este path
+    ├── staging/
+    └── production/
 ```
 
-## Como o ArgoCD é instalado (via Kustomize)
+## Como o bootstrap acontece (via Terraform)
 
-`install/kustomization.yaml` referencia o **manifesto oficial de instalação
-como base remota, pinado por versão**:
+O bootstrap **não é manual** — quem instala o ArgoCD é o Terraform, no stack
+`iac/environments/<env>-bootstrap`, usando o provider `kbst/kustomization` para
+aplicar `gitops/clusters/<env>`. Esse path junta duas coisas:
 
-```yaml
-resources:
-  - https://raw.githubusercontent.com/argoproj/argo-cd/v3.4.5/manifests/install.yaml
-```
+1. **`install/`** — instala o ArgoCD (baixa a base oficial pinada + aplica a config).
+2. **`root.yaml`** — o **root Application (app-of-apps)** daquele cluster, que
+   aponta para `apps/<env>`.
 
-O Kustomize **baixa** esse manifesto no momento do `build` e nós sobrepomos a
-nossa configuração por cima, via `patches` (strategic merge) nos ConfigMaps que
-já vêm no install (`argocd-cm`, `argocd-rbac-cm`, `argocd-cmd-params-cm`) e
-adicionando o Secret de repositório. Vantagens:
-
-- **Reprodutível**: a versão é fixa; atualizar o ArgoCD é bumpar a tag e revisar
-  o diff (`make diff`).
-- **Declarativo e versionado**: repositório, usuários e RBAC ficam em Git, não
-  em cliques na UI.
-
-## Configuração que já aponta para o repo e os usuários
-
-- **Repositório** (`repositories.yaml`): Secret com a label
-  `argocd.argoproj.io/secret-type: repository` e a `url` do repo. As Applications
-  em `apps/` referenciam essa mesma `repoURL`.
-- **Usuários** (`argocd-cm.yaml`): contas locais `devops` (login + API key) e
-  `viewer` (login). O ideal em produção é **SSO/OIDC** (exemplo comentado no
-  arquivo) e desabilitar contas locais.
-- **RBAC** (`argocd-rbac-cm.yaml`): papéis `devops` (opera staging + gerencia
-  Applications) e `prod-approver` (**único que pode dar Sync em produção**).
-  Isso reforça o gate de produção também no controle de acesso.
-
-> As **senhas** das contas não ficam no Git. Elas vão no Secret `argocd-secret`
-> (hash bcrypt), aplicado fora do repositório. Gere o hash com:
-> `argocd account bcrypt --password '<senha>'` e faça `kubectl patch secret
-> argocd-secret -n argocd -p '{"stringData":{"accounts.devops.password":"<hash>"}}'`.
-
-## Bootstrap
-
-Pré-requisitos: `kubectl` apontando para o cluster + `kustomize`.
+A partir daí o ArgoCD assume: o root sincroniza `apps/<env>`, que contém os
+AppProjects, o ESO e a Application da app — tudo com `sync-wave` para ordenar
+(projects → ESO → app).
 
 ```bash
-cd gitops
-make bootstrap      # instala o ArgoCD (fase 1), espera subir, aplica as Apps (fase 2)
-make password       # senha inicial do admin (para o primeiro login)
+# o comando real é o do Terraform (ex.: developer):
+terraform -chdir=iac/environments/developer-bootstrap apply
 ```
 
-Por que **duas fases**? Os CRDs `Application`/`AppProject` são criados no
-install; as Applications em `apps/` só podem ser aplicadas depois que esses CRDs
-existem. O `Makefile` faz `install` → `rollout status` → `apps` nessa ordem.
-(O install usa `kubectl apply --server-side` porque os CRDs do ArgoCD têm
-anotações grandes demais para o apply client-side.)
+## Por que app-of-apps POR CLUSTER
 
-Alternativa mais idiomática (não incluída para manter o exemplo enxuto):
-**app-of-apps** — após o install, uma única "root Application" apontando para
-`gitops/apps` faz o próprio ArgoCD gerenciar as demais Applications.
+Modelo escolhido: **um ArgoCD por cluster**. Cada cluster registra só o seu
+ambiente. O `apps/developer` referencia apenas a Application `dito-api-developer`
+— então o ArgoCD do cluster developer **nunca** tenta deployar os overlays de
+staging/production. Isso evita conflito (todos os overlays miram o mesmo
+namespace `dito-app`) e mantém o blast-radius por cluster.
+
+A `base/` (AppProjects + ESO) é compartilhada via Kustomize entre os três
+ambientes, evitando duplicação; só a Application da app muda por ambiente.
+
+## Comandos úteis (após o ArgoCD subir)
+
+```bash
+# senha inicial do admin
+kubectl -n argocd get secret argocd-initial-admin-secret \
+  -o jsonpath='{.data.password}' | base64 -d; echo
+
+# acessar a UI em https://localhost:8080
+kubectl -n argocd port-forward svc/argocd-server 8080:443
+
+# ver o estado das Applications
+kubectl -n argocd get applications
+```
+
+> As contas/senhas nomeadas (não o admin) ficam no Secret `argocd-secret` com
+> hash bcrypt, aplicado fora do Git. Gere com
+> `argocd account bcrypt --password '<senha>'`. O ideal em produção é SSO/OIDC
+> (exemplo comentado em `install/argocd-cm.yaml`) e desabilitar o admin local.
 
 ---
 
 ## Modelo de promoção (staging -> production)
 
-A estratégia é **por diretório/overlay na mesma branch (`main`)**, não por
-branch de longa duração:
+Estratégia **por diretório/overlay na mesma branch (`main`)**, não por branch:
 
 - `manifests/overlays/staging` — estado desejado de staging.
 - `manifests/overlays/production` — estado desejado de produção.
 
-**Fluxo de promoção:**
+**Fluxo:**
 
-1. Um merge em `app/` gera uma imagem nova e a pipeline atualiza a tag no overlay
-   de **staging**. O ArgoCD de staging sincroniza **automaticamente**.
-2. Validado em staging, abre-se um PR copiando a mesma tag (SHA) para o overlay
-   de **production**. O PR é revisado/aprovado (code review).
-3. Após o merge, o ArgoCD marca a Application de produção como `OutOfSync`. Um
-   usuário com papel `prod-approver` aprova clicando em **Sync** — o gate humano.
+1. Merge em `app/` gera imagem nova; a pipeline atualiza a tag no overlay de
+   **staging**. O ArgoCD de staging sincroniza **automaticamente**.
+2. Validado, um PR copia a mesma tag (SHA) para o overlay de **production**.
+3. Após o merge, a Application de produção fica `OutOfSync`. Um usuário com o
+   papel `prod-approver` aprova o **Sync** — o gate humano.
 
-### Por que overlay/diretório em vez de branch por ambiente?
+## Automático em staging/developer, manual em produção
 
-- **Uma fonte da verdade**: o estado dos dois ambientes fica visível na mesma
-  branch; a promoção é um PR simples e auditável.
-- **Sem merges entre branches de ambiente**, que acumulam divergência.
-- **Imagens imutáveis por SHA**: promover é mudar uma tag; o que foi testado em
-  staging é bit-a-bit o que vai para produção.
-
-## Automático em staging, manual em produção
-
-- **Staging** (`apps/application-staging.yaml`): `syncPolicy.automated` com
-  `prune` e `selfHeal`. Entrega contínua, sem intervenção.
-- **Produção** (`apps/application-production.yaml`): **sem** bloco `automated`.
-  O ArgoCD detecta o drift mas espera aprovação manual (`Sync`). Reforços extras:
-  RBAC (`prod-approver`) e possibilidade de **Sync Windows** para restringir
-  janelas de deploy.
+- **developer/staging** (`apps/*/app.yaml`): `syncPolicy.automated` (prune +
+  selfHeal). Entrega contínua.
+- **production** (`apps/production/app.yaml`): **sem** `automated`. O ArgoCD
+  detecta o drift e espera aprovação manual. Reforço extra no RBAC
+  (`prod-approver`) — ver `install/argocd-rbac-cm.yaml`.
