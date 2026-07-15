@@ -47,3 +47,13 @@ output "app_api_key_secret_id" {
   description = "secret_id do secret de aplicação."
   value       = module.platform.app_api_key_secret_id
 }
+
+output "wif_provider" {
+  description = "Valor do secret WIF_PROVIDER no GitHub."
+  value       = module.cicd.wif_provider
+}
+
+output "cicd_service_account" {
+  description = "Valor do secret do GitHub com a SA que o Actions impersona."
+  value       = module.cicd.service_account_email
+}

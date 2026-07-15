@@ -17,3 +17,9 @@ variable "master_authorized_networks" {
   }))
   default = []
 }
+
+variable "github_repo" {
+  description = "Repositório GitHub autorizado a assumir a SA do CI (owner/repo)."
+  type        = string
+  default     = "flaviolongue/teste-gcp-dito"
+}
