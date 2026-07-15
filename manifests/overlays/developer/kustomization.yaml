@@ -9,7 +9,7 @@ resources:
 images:
 - name: dito-internal-api
   newName: southamerica-east1-docker.pkg.dev/project-4a372108-be7a-4159-966/dito-developer-docker/dito-internal-api
-  newTag: f092f77
+  newTag: 872a9ce
 
 replicas:
 - count: 2
