@@ -29,6 +29,13 @@ module "platform" {
 
   master_authorized_networks = var.master_authorized_networks
 
+  # Labels GCP aplicados aos recursos que suportam (GKE, Cloud SQL, Artifact
+  # Registry, IP do Gateway) — permite achar/filtrar tudo do developer.
+  resource_labels = {
+    environment = "developer"
+    managed-by  = "terraform"
+  }
+
   # Ambiente descartável: sem proteção contra destruição (facilita o destroy).
   deletion_protection = false
 }
