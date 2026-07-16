@@ -20,7 +20,7 @@ module "platform" {
   gke_spot               = false
   gke_machine_type       = "e2-standard-2"
   gke_min_nodes_per_zone = 1
-  gke_max_nodes_per_zone = 3
+  gke_max_nodes_per_zone = 4
 
   # Banco mínimo.
   db_tier              = "db-f1-micro"
