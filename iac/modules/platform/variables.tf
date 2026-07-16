@@ -147,3 +147,10 @@ variable "deletion_protection" {
   type        = bool
   default     = false
 }
+
+# --- Labels ------------------------------------------------------------------
+variable "resource_labels" {
+  description = "Labels (GCP) aplicados a GKE, Cloud SQL, Artifact Registry e o IP do Gateway. Secrets ficam de fora (o módulo exige label por-secret); VPC/subnet/NAT/Service Accounts não suportam labels no GCP."
+  type        = map(string)
+  default     = {}
+}

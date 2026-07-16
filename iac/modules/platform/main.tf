@@ -114,6 +114,9 @@ module "gke" {
   node_pools_labels = {
     all = { env = var.environment }
   }
+
+  # Labels GCP no cluster (e recursos GCE que ele cria).
+  cluster_resource_labels = var.resource_labels
 }
 
 # --- IP estático do Gateway (Application LB) --------------------------------
@@ -125,6 +128,7 @@ resource "google_compute_global_address" "gateway" {
   name         = "${local.name_prefix}-gateway-ip"
   project      = var.project_id
   address_type = "EXTERNAL"
+  labels       = var.resource_labels
 
   depends_on = [google_project_service.apis]
 }
@@ -202,6 +206,7 @@ module "postgres" {
   db_name       = "app"
   user_name     = "app"
   user_password = random_password.db.result
+  user_labels   = var.resource_labels
 
   module_depends_on = [module.private_service_access.peering_completed]
 }
@@ -224,6 +229,8 @@ module "secret_manager" {
       secret_data           = var.app_api_key_placeholder
     },
   ]
+  # Secrets NÃO recebem label: o módulo exige labels por-secret (map(map(string))),
+  # o que acopla ao nome de cada secret sem ganho real.
 
   depends_on = [google_project_service.apis]
 }
@@ -253,6 +260,7 @@ module "artifact_registry" {
   repository_id = "${local.name_prefix}-docker"
   format        = "DOCKER"
   description   = "Imagens Docker da aplicação (${var.environment})."
+  labels        = var.resource_labels
 
   depends_on = [google_project_service.apis]
 }

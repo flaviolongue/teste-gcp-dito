@@ -27,20 +27,70 @@ env:
 
 jobs:
   # ---------------------------------------------------------------------------
-  # PR: fmt + validate (os 3 ambientes) + plan (developer). Não aplica nada.
+  # Descobre QUAIS ambientes foram afetados, para não rodar os três à toa.
   #
-  # O `validate` roda para developer, staging e production — demonstra que os
-  # três estão íntegros. O `plan` real roda só no developer, porque staging e
-  # production apontam para projetos GCP que ainda não existem neste teste
-  # single-project (num cenário multi-projeto, o plan rodaria nos três).
+  # Regra:
+  #   - mudou algo compartilhado (iac/modules/**, iac/bootstrap/** ou o próprio
+  #     workflow) -> afeta TODOS os ambientes;
+  #   - mudou só iac/environments/<env>/** -> afeta APENAS aquele ambiente.
+  #
+  # Assim, uma mudança só no developer não dispara plan/apply de staging/prod.
+  # ---------------------------------------------------------------------------
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      envs: ${{ steps.detect.outputs.envs }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # precisa de histórico para o diff.
+
+      - id: detect
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git fetch -q origin "${{ github.base_ref }}"
+            BASE="origin/${{ github.base_ref }}"
+          else
+            BASE="${{ github.event.before }}"
+          fi
+          # Se a base for inválida (ex.: primeiro push), compara com o pai.
+          if ! git rev-parse -q --verify "$BASE^{commit}" >/dev/null; then
+            BASE="HEAD^"
+          fi
+
+          CHANGED=$(git diff --name-only "$BASE" HEAD)
+          echo "Arquivos alterados:"; echo "$CHANGED"
+
+          if echo "$CHANGED" | grep -qE '^iac/(modules|bootstrap)/|^\.github/workflows/terraform\.yml'; then
+            # Mudança compartilhada -> todos os ambientes.
+            ENVS='["developer","staging","production"]'
+          else
+            SEL=()
+            for e in developer staging production; do
+              if echo "$CHANGED" | grep -qE "^iac/environments/${e}(-bootstrap)?/"; then
+                SEL+=("\"$e\"")
+              fi
+            done
+            ENVS="[$(IFS=,; echo "${SEL[*]}")]"
+          fi
+          echo "Ambientes afetados: $ENVS"
+          echo "envs=$ENVS" >> "$GITHUB_OUTPUT"
+
+  # ---------------------------------------------------------------------------
+  # PR: fmt + validate + plan, apenas nos ambientes afetados. Não aplica nada.
+  #
+  # O plan real roda só no developer (único ambiente provisionado neste teste);
+  # para staging/production faz validate (seus projetos GCP ainda não existem).
   # ---------------------------------------------------------------------------
   plan:
-    if: github.event_name == 'pull_request'
+    needs: changes
+    if: github.event_name == 'pull_request' && needs.changes.outputs.envs != '[]'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        environment: [developer, staging, production]
+        environment: ${{ fromJson(needs.changes.outputs.envs) }}
     defaults:
       run:
         working-directory: iac/environments/${{ matrix.environment }}
@@ -61,13 +111,11 @@ jobs:
           workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
           service_account: ${{ secrets.TF_SERVICE_ACCOUNT }}
 
-      # validate funciona offline (sem state/credencial) para os três ambientes.
       - name: terraform validate
         run: |
           terraform init -backend=false -input=false
           terraform validate -no-color
 
-      # plan real apenas do developer (único ambiente provisionado neste teste).
       - name: terraform plan
         id: plan
         if: matrix.environment == 'developer'
@@ -102,29 +150,28 @@ jobs:
         run: exit 1
 
   # ---------------------------------------------------------------------------
-  # Merge em main: apply nos três ambientes.
+  # Merge em main: apply, apenas nos ambientes afetados.
   #
-  # O GATE de aprovação vem do `environment:` abaixo, combinado com os GitHub
+  # O GATE de aprovação vem do `environment:` combinado com os GitHub
   # Environments (Settings → Environments → Required reviewers):
   #   - developer  -> sem proteção        -> aplica automaticamente
   #   - production -> required reviewers   -> ESPERA aprovação manual (por spec)
-  #   - staging    -> required reviewers   -> aqui gated apenas para o teste não
-  #                  tentar aplicar num projeto que ainda não existe; num cenário
-  #                  multi-projeto real, staging seria auto (sem reviewer).
+  #   - staging    -> required reviewers   -> gated só para este teste não tentar
+  #                  aplicar num projeto que ainda não existe; em multi-projeto
+  #                  real seria auto (sem reviewer).
   #
-  # Ou seja, a aprovação manual obrigatória antes do apply em production é
-  # imposta pelo próprio GitHub, não por um passo no YAML.
-  #
-  # Neste teste single-project, só o developer aplica de verdade.
+  # A aprovação manual antes do apply em production é imposta pelo GitHub, não
+  # por um passo no YAML.
   # ---------------------------------------------------------------------------
   apply:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: changes
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.envs != '[]'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      max-parallel: 1 # developer antes de staging/production.
+      max-parallel: 1
       matrix:
-        environment: [developer, staging, production]
+        environment: ${{ fromJson(needs.changes.outputs.envs) }}
     environment: ${{ matrix.environment }}
     defaults:
       run:
