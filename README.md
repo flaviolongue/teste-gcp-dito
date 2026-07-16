@@ -375,25 +375,77 @@ kubectl -n apps get secret dito-api-secrets -o jsonpath='{.data}'
 
 ## CI/CD
 
-### `terraform.yml` (dispara em `iac/**`)
-- **Em PR:** `fmt -check` → `init` → `validate` → `plan`, comentado no PR.
-- **Em merge para `main`:** `apply`. Staging aplica direto; **production usa um
-  GitHub Environment com *required reviewers*** — o job fica pendente até
-  aprovação. É esse Environment que implementa o gate obrigatório antes do apply
-  em produção.
+São dois workflows, e ambos foram **exercitados de verdade** neste repositório
+(ver os runs em Actions e os PRs #1/#2).
 
-### `app.yml` (dispara em `app/**`)
-- **Em PR:** build da imagem (validação, sem push).
-- **Em merge para `main`:** autentica via **WIF**, build + push no Artifact
-  Registry com **tag imutável (SHA curto)**, depois `kustomize edit set image` no
-  overlay + commit. Esse commit é o gatilho do ArgoCD — fecha o loop GitOps.
-- Usa o `GITHUB_TOKEN` padrão no commit (sem PAT). Commits com ele não disparam
-  workflows, evitando loop.
+### Autenticação: Workload Identity Federation (keyless)
 
-A SA do pipeline recebe **apenas** `roles/artifactregistry.writer` **no
-repositório de imagens** — e o provider OIDC tem
-`attribute_condition = "assertion.repository == '<owner/repo>'"`, travando o
-acesso ao nosso repositório.
+Nenhum dos workflows usa chave JSON. O GitHub emite um token OIDC e a GCP o
+troca por credenciais de curta duração, impersonando uma Service Account. O
+provider OIDC tem `attribute_condition = "assertion.repository ==
+'<owner/repo>'"`, então **só workflows deste repositório** conseguem assumir as
+SAs. Há duas SAs, com papéis distintos:
+
+| SA | Usada por | Permissão |
+|---|---|---|
+| `<env>-gh-actions` | `app.yml` (build/push) | **só** `artifactregistry.writer` no repo de imagens |
+| `<env>-tf` | `terraform.yml` (plan/apply) | ampla (marcada `TEST-ONLY` como `owner`; curar em produção) |
+
+Configuração no GitHub (feita uma vez, com valores vindos de `terraform output`):
+`WIF_PROVIDER`, `TF_SERVICE_ACCOUNT`, `APP_DEPLOYER_SERVICE_ACCOUNT` (secrets) e
+`ARTIFACT_REGISTRY`, `TF_STATE_BUCKET` (variables).
+
+### `terraform.yml` — infraestrutura (dispara em `iac/**`)
+
+**Matrix dinâmico por path.** Um job `changes` roda um `git diff` e decide quais
+ambientes são afetados, para não rodar os três à toa:
+
+| Mudou | Roda |
+|---|---|
+| `iac/modules/**` ou `iac/bootstrap/**` (compartilhado) | **os 3 ambientes** |
+| `iac/environments/developer/**` | **só developer** |
+| `iac/environments/staging/**` | **só staging** |
+
+**Fluxo de uso (o dia a dia):**
+
+1. Você abre um **PR** com uma mudança em `iac/`. O job `plan` roda `fmt` +
+   `validate` nos ambientes afetados e **comenta o resumo do plan no PR**
+   (ex.: `Plan: 0 to add, 4 to change, 0 to destroy`). **Não aplica nada.**
+2. Revisa o plan no PR e faz **merge para `main`**.
+3. O job `apply` roda nos ambientes afetados:
+   - **developer** → aplica automaticamente;
+   - **production** → o job entra em **`waiting`** e só prossegue após
+     **aprovação manual** (GitHub Environment `production` com *required
+     reviewers*). É esse Environment — não um passo no YAML — que implementa o
+     gate obrigatório antes do apply em produção;
+   - **staging** → aqui também gated (só para o teste não tentar aplicar num
+     projeto inexistente); num cenário multi-projeto real seria automático.
+
+> **Validado:** o PR #1 (mudança em `environments/developer/`) rodou só o
+> developer e aplicou; um merge que tocou `modules/` expandiu o matrix para os 3
+> e production ficou aguardando aprovação.
+
+### `app.yml` — aplicação (dispara em `app/**`)
+
+**Fluxo de uso:**
+
+1. **Em PR:** build da imagem (validação, sem push).
+2. **Em merge para `main`:** autentica via WIF → build + push no Artifact
+   Registry com **tag imutável (SHA curto**, nunca `:latest`) → `kustomize edit
+   set image` no overlay do ambiente → **commit** da nova tag.
+3. Esse commit é o gatilho do **ArgoCD**, que faz o deploy — fecha o loop GitOps.
+
+O commit da tag usa o `GITHUB_TOKEN` padrão (sem PAT); commits feitos com ele
+não disparam workflows, evitando loop.
+
+> **Validado:** um push em `app/` buildou, deu push da imagem, atualizou o
+> overlay e o ArgoCD subiu a nova versão sozinho.
+
+### Como um novo ambiente entra no pipeline
+
+Nada muda no YAML — é só criar `iac/environments/<env>/` e o Environment
+correspondente no GitHub (com ou sem required reviewers). O matrix dinâmico
+passa a considerá-lo automaticamente quando arquivos dele mudarem.
 
 ---
 
