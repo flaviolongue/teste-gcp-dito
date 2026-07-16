@@ -30,7 +30,7 @@ jobs:
     outputs:
       tag: ${{ steps.meta.outputs.tag }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # Tag imutável = SHA curto do commit. Nunca "latest" para deploy.
       - name: Definir tag da imagem
@@ -67,7 +67,7 @@ jobs:
     steps:
       # Usa o GITHUB_TOKEN padrão (permissions.contents: write) — sem PAT.
       # Commits feitos com ele não disparam workflows, evitando loop.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Instalar kustomize
         run: |

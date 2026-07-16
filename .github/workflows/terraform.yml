@@ -41,7 +41,7 @@ jobs:
     outputs:
       envs: ${{ steps.detect.outputs.envs }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0 # precisa de histórico para o diff.
 
@@ -95,7 +95,7 @@ jobs:
       run:
         working-directory: iac/environments/${{ matrix.environment }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: hashicorp/setup-terraform@v3
         with:
@@ -126,7 +126,7 @@ jobs:
 
       - name: Comentar plan no PR
         if: matrix.environment == 'developer'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           PLAN_STATUS: ${{ steps.plan.outcome }}
         with:
@@ -177,7 +177,7 @@ jobs:
       run:
         working-directory: iac/environments/${{ matrix.environment }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: hashicorp/setup-terraform@v3
         with:
