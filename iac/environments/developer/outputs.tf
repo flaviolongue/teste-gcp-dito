@@ -57,3 +57,8 @@ output "cicd_service_account" {
   description = "Valor do secret do GitHub com a SA que o Actions impersona."
   value       = module.cicd.service_account_email
 }
+
+output "terraform_service_account" {
+  description = "SA de Terraform do CI (secret TF_SERVICE_ACCOUNT no GitHub)."
+  value       = module.cicd.terraform_service_account_email
+}

@@ -28,6 +28,25 @@ resource "google_artifact_registry_repository_iam_member" "writer" {
   member     = "serviceAccount:${google_service_account.gh_actions.email}"
 }
 
+# SA usada pelo pipeline de Terraform (plan/apply da infra).
+resource "google_service_account" "terraform" {
+  account_id   = "${var.name_prefix}-tf"
+  display_name = "GitHub Actions - Terraform plan/apply"
+  project      = var.project_id
+}
+
+# ATENÇÃO / TEST-ONLY: roles/owner para o Terraform gerenciar tudo sem esbarrar
+# em permissão faltando no meio de um apply em CI. Em PRODUÇÃO isto DEVE ser um
+# conjunto curado de menor privilégio, algo como:
+#   roles/editor, roles/resourcemanager.projectIamAdmin,
+#   roles/iam.serviceAccountAdmin, roles/iam.workloadIdentityPoolAdmin,
+#   roles/secretmanager.admin, roles/artifactregistry.admin
+resource "google_project_iam_member" "terraform_owner" {
+  project = var.project_id
+  role    = "roles/owner"
+  member  = "serviceAccount:${google_service_account.terraform.email}"
+}
+
 # Pool + provider OIDC do GitHub.
 module "gh_oidc" {
   source  = "terraform-google-modules/github-actions-runners/google//modules/gh-oidc"
@@ -47,10 +66,14 @@ module "gh_oidc" {
     "attribute.ref"        = "assertion.ref"
   }
 
-  # Liga o repositório à SA: só workflows deste repo assumem esta identidade.
+  # Liga o repositório às SAs: só workflows deste repo assumem estas identidades.
   sa_mapping = {
     (google_service_account.gh_actions.account_id) = {
       sa_name   = google_service_account.gh_actions.name
+      attribute = "attribute.repository/${var.github_repo}"
+    }
+    (google_service_account.terraform.account_id) = {
+      sa_name   = google_service_account.terraform.name
       attribute = "attribute.repository/${var.github_repo}"
     }
   }

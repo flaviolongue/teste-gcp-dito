@@ -27,15 +27,20 @@ env:
 
 jobs:
   # ---------------------------------------------------------------------------
-  # 1) Validação em PRs: fmt + validate + plan para staging e production.
+  # PR: fmt + validate (os 3 ambientes) + plan (developer). Não aplica nada.
+  #
+  # O `validate` roda para developer, staging e production — demonstra que os
+  # três estão íntegros. O `plan` real roda só no developer, porque staging e
+  # production apontam para projetos GCP que ainda não existem neste teste
+  # single-project (num cenário multi-projeto, o plan rodaria nos três).
   # ---------------------------------------------------------------------------
-  validate:
+  plan:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        environment: [staging, production]
+        environment: [developer, staging, production]
     defaults:
       run:
         working-directory: iac/environments/${{ matrix.environment }}
@@ -46,66 +51,80 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
-      # Autentica no projeto do ambiente. Os identificadores do WIF ficam em
-      # Environment secrets/vars — nunca em texto no repositório.
+      - name: terraform fmt
+        run: terraform fmt -check -recursive
+        working-directory: iac
+
       - id: auth
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
           service_account: ${{ secrets.TF_SERVICE_ACCOUNT }}
 
-      - name: terraform fmt
-        run: terraform fmt -check -recursive -diff
-        working-directory: iac
-
-      - name: terraform init
-        run: terraform init -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}"
-
+      # validate funciona offline (sem state/credencial) para os três ambientes.
       - name: terraform validate
-        run: terraform validate -no-color
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate -no-color
 
+      # plan real apenas do developer (único ambiente provisionado neste teste).
       - name: terraform plan
         id: plan
-        run: terraform plan -no-color -input=false -out=tfplan
+        if: matrix.environment == 'developer'
+        run: |
+          terraform init -reconfigure -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}" -input=false
+          terraform plan -no-color -input=false -out=tfplan
         continue-on-error: true
 
       - name: Comentar plan no PR
+        if: matrix.environment == 'developer'
         uses: actions/github-script@v7
         env:
           PLAN_STATUS: ${{ steps.plan.outcome }}
         with:
           script: |
-            const body = `#### Terraform Plan — \`${{ matrix.environment }}\`: \`${process.env.PLAN_STATUS}\`
-            <details><summary>Detalhes</summary>
-
-            Rode \`terraform show tfplan\` no runner para o output completo.
-            </details>`;
+            const { execSync } = require('child_process');
+            let summary = '';
+            try {
+              summary = execSync('terraform show -no-color tfplan', {
+                cwd: 'iac/environments/developer'
+              }).toString().split('\n').filter(l => /^Plan:|No changes/.test(l)).join('\n');
+            } catch (e) { summary = '(sem resumo)'; }
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body
+              body: `#### Terraform Plan — \`developer\`: \`${process.env.PLAN_STATUS}\`\n\`\`\`\n${summary}\n\`\`\``
             });
 
       - name: Falhar se o plan falhou
-        if: steps.plan.outcome == 'failure'
+        if: matrix.environment == 'developer' && steps.plan.outcome == 'failure'
         run: exit 1
 
   # ---------------------------------------------------------------------------
-  # 2) Apply em merge para main.
-  #    - staging: aplica automaticamente.
-  #    - production: exige aprovação manual (GitHub Environment "production"
-  #      configurado com required reviewers).
+  # Merge em main: apply nos três ambientes.
+  #
+  # O GATE de aprovação vem do `environment:` abaixo, combinado com os GitHub
+  # Environments (Settings → Environments → Required reviewers):
+  #   - developer  -> sem proteção        -> aplica automaticamente
+  #   - production -> required reviewers   -> ESPERA aprovação manual (por spec)
+  #   - staging    -> required reviewers   -> aqui gated apenas para o teste não
+  #                  tentar aplicar num projeto que ainda não existe; num cenário
+  #                  multi-projeto real, staging seria auto (sem reviewer).
+  #
+  # Ou seja, a aprovação manual obrigatória antes do apply em production é
+  # imposta pelo próprio GitHub, não por um passo no YAML.
+  #
+  # Neste teste single-project, só o developer aplica de verdade.
   # ---------------------------------------------------------------------------
   apply:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     strategy:
-      max-parallel: 1 # staging antes de production.
+      fail-fast: false
+      max-parallel: 1 # developer antes de staging/production.
       matrix:
-        environment: [staging, production]
-    # O gate de aprovação vem daqui: o Environment "production" no GitHub tem
-    # "Required reviewers". O "staging" não tem, então flui direto.
+        environment: [developer, staging, production]
     environment: ${{ matrix.environment }}
     defaults:
       run:
