@@ -13,6 +13,75 @@ segura — na GCP, com Terraform, ArgoCD e GitHub Actions.
 
 ---
 
+## Transparência sobre o uso de IA
+
+Este desafio foi desenvolvido com o apoio de uma IA — o **Claude Code**
+(Anthropic). Não faz sentido esconder isso; preferimos ser explícitos, porque a
+**forma** como a IA foi usada importa tanto quanto o resultado.
+
+### Como foi conduzido — dirigido por decisão humana
+
+O trabalho partiu do enunciado do desafio e de **premissas e decisões que nós
+definimos** (arquitetura, escopo, restrições). A IA executou **dentro desse
+escopo**, sob direção humana contínua — e as mudanças de rumo mais importantes
+foram **decisões humanas, muitas vezes corrigindo o caminho que a IA propunha**:
+
+- **Gateway API** (Application LB gerenciado) no lugar de Ingress/nginx, por
+  causa do roteamento cross-namespace num único IP;
+- o modelo de namespaces **`apps` / `argocd` / `tools`** — simplificado depois de
+  descartarmos namespaces por ambiente;
+- o **split de stacks de Terraform** (infra + bootstrap do ArgoCD) para evitar o
+  problema de provider dependendo de recurso do mesmo apply;
+- o **matrix dinâmico por path** na pipeline, depois de percebermos que o filtro
+  `paths:` dispara o workflow inteiro.
+
+Ou seja: não foi "aceitar o output da IA" — cada decisão de arquitetura passou
+por avaliação humana, e a íntegra das interações pode ser fornecida ao avaliador.
+
+### Uso seguro — toda ação teve aprovação humana
+
+- **A IA só interagiu com o ambiente através das chamadas de ferramenta do
+  Claude Code** (comandos de shell e edições de arquivo), executadas no terminal,
+  **cada uma visível e sujeita a aprovação ou rejeição do humano** — e várias
+  foram, de fato, rejeitadas/redirecionadas ao longo do trabalho.
+- A IA **não teve acesso autônomo ou irrestrito**: nada rodou sem que o humano
+  pudesse aprovar. Todo `terraform apply`, todo deploy e todo `git push`
+  aconteceram com **autorização humana explícita**.
+- **Nenhuma credencial foi entregue à IA de forma insegura**: a autenticação no
+  GCP (`gcloud auth login` / ADC) foi feita pelo humano; a autenticação do CI é
+  **keyless (Workload Identity Federation)**, sem chave JSON; nenhum segredo foi
+  exposto em texto para a IA.
+
+Em resumo: a IA foi uma ferramenta de execução acelerada, **sob controle e
+responsabilidade humana do início ao fim**.
+
+### Mensagem final (humana)
+
+> Faço questão de registrar que **todas as direções deste projeto foram decisões
+> minhas** — inclusive o que eu considero um fluxo de pipeline adequado, tanto
+> para o Terraform quanto para a aplicação.
+>
+> Uma premissa que quis seguir do início ao fim foi **não criar nada na nuvem na
+> mão**: tudo é provisionado pelo Terraform. Mesmo que isso signifique rodar o
+> Terraform mais de uma vez — como a arquitetura pede (a infraestrutura e o
+> bootstrap do ArgoCD em camadas separadas) —, desde que seja de forma
+> **sequencial e coerente**.
+>
+> Fiz questão também de que **todos os ambientes nasçam dos mesmos módulos**, o
+> que me dá reaproveitamento de código: o que muda entre developer, staging e
+> produção é a configuração, não a lógica.
+>
+> E decidi por **um ArgoCD por ambiente**, para poder espelhar esse tipo de
+> ambiente em qualquer lugar com apenas um trabalho de configuração — um pouco
+> mais orientado ao propósito de cada ambiente.
+>
+> É mais ou menos essa a concepção com que adequei o teste, e o que gostaria de
+> deixar registrado para vocês.
+>
+> — Flávio
+
+---
+
 ## Índice
 
 - [O que está rodando](#o-que-está-rodando)
@@ -46,6 +115,35 @@ Um ambiente `developer` completo, aplicado numa conta GCP real:
 
 Resultado final: `dito-api 2/2 Running`, as 4 Applications `Synced/Healthy`, e a
 app respondendo `HTTP 200` através do Load Balancer.
+
+## Ambiente ao vivo (para avaliação)
+
+O ambiente `developer` está **no ar numa conta GCP real**, exposto pela
+Cloudflare. Dá para conferir de fora:
+
+| | URL | Acesso |
+|---|---|---|
+| **Aplicação** | https://app-developer-dito.dev4cloud.online | público — `/healthz` responde `ok` |
+| **ArgoCD** | https://argocd-developer-dito.dev4cloud.online | usuário `viewer` (**somente leitura**) — **senha entregue separadamente (pelo RH)** |
+
+### Como testar o fluxo GitOps
+
+O ciclo é observável de ponta a ponta:
+
+- **Mudança em `iac/`** → abre um **PR** com o `plan` comentado; o **merge**
+  aplica no ambiente. Uma mudança em `iac/environments/developer/` é espelhada
+  **só** no developer; uma em `iac/modules/` afeta todos (ver PRs #1 e #2 e os
+  runs em *Actions*).
+- **Mudança em `app/`** → builda a imagem, dá push no Artifact Registry e o
+  **ArgoCD sincroniza sozinho** — dá para acompanhar na UI do ArgoCD e ver a
+  nova versão respondendo em `app-developer-dito.dev4cloud.online`.
+
+Ou seja: **uma mudança no Git é espelhada no ambiente automaticamente** (ou, em
+produção, após aprovação manual).
+
+> A senha do ArgoCD **não vai no repositório de propósito**: o projeto inteiro é
+> sobre não versionar segredo (Secret Manager, ESO, WIF keyless). Mantê-la fora
+> do Git é coerência com a própria arquitetura — ela é entregue por outro canal.
 
 ## Arquitetura
 
