@@ -34,3 +34,8 @@ output "app_api_key_secret_id" {
   description = "secret_id do secret de aplicação."
   value       = module.platform.app_api_key_secret_id
 }
+
+output "gke_location" {
+  description = "Location (região) do cluster GKE — consumido pelo stack staging-bootstrap."
+  value       = module.platform.gke_location
+}
